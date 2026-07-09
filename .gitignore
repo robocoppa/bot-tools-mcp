@@ -1,0 +1,13 @@
+# Local secrets — per-bot tokens, Brevo SMTP key, Nextcloud/Radicale passwords.
+# Never commit. Ship .env.example as the template; keep the real .env on the box.
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
