@@ -1,0 +1,30 @@
+# bot-tools-mcp — standalone compose stack (sibling to fleet-watchdog /
+# monitoring). Joins the external ollama-net so it can reach radicale:5232 and
+# nextcloud:80 by container DNS, and is published on the host LAN at
+# 192.168.1.11:9110 so bot laptops can POST to /mcp.
+#
+# The Radicale and Nextcloud + Collabora services are deployed by their own
+# stacks (audrey_ai_2.0/docs/plans/bot-tools/) — this file is just the MCP
+# server. It only needs those backends reachable on ollama-net, not co-managed.
+#
+# Deploy on Unraid:
+#   cd /mnt/user/appdata/bot-tools
+#   cp .env.example .env    # fill in per-bot tokens + backend creds
+#   docker compose up -d --build
+
+services:
+  bot-tools-mcp:
+    build: .
+    container_name: bot-tools-mcp
+    restart: unless-stopped
+    ports:
+      # LAN only — bots hit http://192.168.1.11:9110/mcp
+      - "9110:9110"
+    env_file:
+      - .env
+    networks:
+      - ollama-net
+
+networks:
+  ollama-net:
+    external: true

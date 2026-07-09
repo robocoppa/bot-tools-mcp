@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Shared HTTP MCP server giving LAN bots email (Brevo), calendar (Radicale) and docs/sheets (Nextcloud) tools, with per-bot bearer-token identity. Sibling service to Audrey; zero Google."
 requires-python = ">=3.11"
 dependencies = [
-    "fastmcp>=2.0",
+    "fastmcp>=3.4",
     "aiosmtplib>=3.0",
     "icalendar>=6.0",
     "caldav>=1.3",
@@ -12,6 +12,9 @@ dependencies = [
     "openpyxl>=3.1",
     "python-docx>=1.1",
 ]
+
+[project.scripts]
+bot-tools-mcp = "bot_tools_mcp.server:run"
 
 [project.optional-dependencies]
 dev = [

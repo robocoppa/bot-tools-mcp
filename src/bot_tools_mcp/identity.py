@@ -76,12 +76,25 @@ class Identity:
         """The bot's email From address: `<bot>@<MAIL_DOMAIN>`."""
         return f"{bot}@{self._require('MAIL_DOMAIN')}"
 
+    def radicale_url(self) -> str:
+        """The internal Radicale base URL (`RADICALE_URL`)."""
+        return self._require("RADICALE_URL")
+
     def radicale_password(self, bot: str) -> str:
         """The bot's own Radicale password (`RADICALE_PASS_<BOT>`).
 
         Username on the CalDAV side is the bot name itself (Stage 2 owner_only).
         """
         return self._require(f"{_RADICALE_PASS_PREFIX}{bot.upper()}")
+
+    def nextcloud_url(self) -> str:
+        """The internal Nextcloud base URL (`NEXTCLOUD_URL`) — for backend I/O."""
+        return self._require("NEXTCLOUD_URL")
+
+    def nextcloud_public_url(self) -> str:
+        """The public Nextcloud URL (`NEXTCLOUD_PUBLIC_URL`) — ONLY for share links
+        handed to humans, never for a server-side backend call (it hairpins)."""
+        return self._require("NEXTCLOUD_PUBLIC_URL")
 
     def nextcloud_password(self, bot: str) -> str:
         """The bot's own Nextcloud app password (`NEXTCLOUD_APP_PASSWORD_<BOT>`)."""
