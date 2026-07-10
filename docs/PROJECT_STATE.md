@@ -22,6 +22,58 @@ the shared server that turns those three backends into per-bot tools.
 
 ## ▶ Status
 
+### 2026-07-10 — STAGE 4 DONE ✅ — all 6 smoke tests pass on the box
+
+The MCP server is live on the box and **every tool is verified end-to-end** with
+real backends. Full smoke suite passed:
+
+1. ✅ Health — server up at `:9110`.
+2. ✅ Auth — discovery open (15 tools), bad token rejected.
+3. ✅ Email — `send_email` landed inbox, From `claudette@builtryte.xyz`, DKIM pass.
+4. ✅ Calendar — `create_event`/`list_events`/`delete_event` round-trip;
+   `send_calendar_invite` saved to Radicale AND emailed a `.ics` invitation.
+5. ✅ Docs/sheets — `.xlsx` + `.docx` round-trip (openpyxl/python-docx);
+   `create_share_link` returned a `cloud.builtryte.xyz/s/…` link that **opens
+   editable in Collabora** (verified in incognito); `list_files` works.
+6. ✅ Per-bot isolation — a bot cannot read another bot's file.
+
+Deployed as `bot-tools-mcp` on `ollama-net`, LAN at `192.168.1.11:9110/mcp`,
+per-bot tokens + creds from `mcp/.env`. Drove the tests from **inside the
+container** (its own token → no mismatch). Two production bugs found+fixed during
+bring-up (auth header stripping; async `Context.get_state`) — see entries below.
+
+**Stage 4 complete. Next: Stage 5 — wire the bots** (each bot's `mcp_servers:`
+config → `http://192.168.1.11:9110/mcp` with its own `BOT_TOKEN`), in the
+`audrey_ai_2.0/docs/plans/bot-tools/stage-5-wire-bots.md` plan.
+
+_Earlier the same day:_
+
+### 2026-07-10 — LIVE ON THE BOX: send_email verified end-to-end ✅
+
+`send_email` works on the box through the real tool path — mail sent through
+Brevo, From `claudette@builtryte.xyz`, landed in the inbox. Smoke test **steps
+1–3 pass** (health, auth gate, real email). This validated the full
+auth → identity → backend chain after fixing two real deploy bugs (below).
+
+**Two production bugs found + fixed during first deploy** (both invisible to the
+mocked unit tests — now guarded):
+1. **Auth header stripped** — `get_http_headers()` drops `authorization` by
+   default; the bearer never reached the gate → every call "unknown or missing
+   bot token". Fix: `get_http_headers(include_all=True)`.
+2. **Async context misuse** — `Context.get_state`/`set_state` are async in this
+   FastMCP; calling them sync made `current_bot` return a *coroutine*, which
+   became the email From → Brevo `501`. Fix: `await` them; `current_bot`/
+   `bot_creds` are now async (7 call sites updated). Test doubles made async so
+   this can't regress.
+
+Also: `.env` `$` in Nextcloud app passwords must be escaped `$$` (Compose
+substitution) — done on the box.
+
+**Next:** smoke steps 4 (calendar) + 5 (docs/sheets, exercises the Nextcloud
+password) + 6 (per-bot isolation). Then Stage 5 (wire the bots).
+
+_Earlier:_
+
 ### 2026-07-10 — First box deploy: fixed a real auth bug (header stripping)
 
 Deployed to the box; the very first authenticated call failed with "unknown or
