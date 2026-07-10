@@ -58,30 +58,34 @@ class BotAuthMiddleware(Middleware):
             # Fail loud and specific — never a bare 500.
             raise AuthorizationError("unknown or missing bot token")
 
-        ctx.fastmcp_context.set_state(_BOT_STATE_KEY, bot)
+        # set_state is async in this FastMCP — must be awaited or the write is a
+        # dangling coroutine and the bot never actually lands in the context.
+        await ctx.fastmcp_context.set_state(_BOT_STATE_KEY, bot)
         return await call_next(ctx)
 
 
-def current_bot(ctx) -> str:
+async def current_bot(ctx) -> str:
     """Read the authenticated bot from a tool's Context.
 
-    Raises `ToolError` if it's absent — which means a tool ran without passing
-    the auth gate (a wiring bug), and we refuse to guess an identity.
+    `get_state` is async in this FastMCP version — it MUST be awaited, or you get
+    a coroutine object instead of the bot name (which then poisons the From
+    header / credential lookup). Raises `ToolError` if absent — which means a tool
+    ran without passing the auth gate (a wiring bug), and we refuse to guess.
     """
-    bot = ctx.get_state(_BOT_STATE_KEY)
+    bot = await ctx.get_state(_BOT_STATE_KEY)
     if not bot:
         raise ToolError("no authenticated bot in context")
     return bot
 
 
-def bot_creds(ctx, password_for) -> tuple[str, str]:
+async def bot_creds(ctx, password_for) -> tuple[str, str]:
     """Return (bot, password) for the authenticated bot, using the given per-bot
     password accessor (e.g. `identity.radicale_password`).
 
     The single place tools derive backend credentials from the authed bot —
     keeps that security-critical step out of each tool module.
     """
-    bot = current_bot(ctx)
+    bot = await current_bot(ctx)
     return bot, password_for(bot)
 
 

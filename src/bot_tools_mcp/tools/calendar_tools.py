@@ -56,7 +56,7 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
         `start`/`end` are ISO-8601 datetimes. Returns an opaque `event_id` you
         pass to `delete_event`.
         """
-        bot, pw = bot_creds(ctx, identity.radicale_password)
+        bot, pw = await bot_creds(ctx, identity.radicale_password)
         s, e = parse_iso(start, "start"), parse_iso(end, "end")
         return await _run(
             cal.create_event, url, bot, pw,
@@ -69,7 +69,7 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
 
         Each event carries an `event_id` usable with `delete_event`.
         """
-        bot, pw = bot_creds(ctx, identity.radicale_password)
+        bot, pw = await bot_creds(ctx, identity.radicale_password)
         s = parse_iso(start, "start") if start else None
         e = parse_iso(end, "end") if end else None
         if (s is None) != (e is None):
@@ -82,7 +82,7 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
         """Delete an event from the calling bot's calendar by its `event_id`."""
         if not event_id or not event_id.strip():
             raise ToolError("'event_id' is required")
-        bot, pw = bot_creds(ctx, identity.radicale_password)
+        bot, pw = await bot_creds(ctx, identity.radicale_password)
         await _run(cal.delete_event, url, bot, pw, event_id=event_id.strip())
         return f"deleted {event_id}"
 
@@ -101,7 +101,7 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
 
         `to` is the attendee list; `start`/`end` are ISO-8601.
         """
-        bot, pw = bot_creds(ctx, identity.radicale_password)
+        bot, pw = await bot_creds(ctx, identity.radicale_password)
         attendees = [a.strip() for a in (to or []) if a and a.strip()]
         if not attendees:
             raise ToolError("'to' must contain at least one attendee")

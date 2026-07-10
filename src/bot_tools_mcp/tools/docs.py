@@ -31,8 +31,8 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         public_url=identity.nextcloud_public_url(),
     )
 
-    def _creds(ctx: Context) -> tuple[str, str]:
-        return bot_creds(ctx, identity.nextcloud_password)
+    async def _creds(ctx: Context) -> tuple[str, str]:
+        return await bot_creds(ctx, identity.nextcloud_password)
 
     async def _run(fn, *args, **kwargs):
         """Run a sync Nextcloud transport op in a thread, surfacing failures loud."""
@@ -55,7 +55,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         (default one sheet named 'Sheet1')."""
         from openpyxl import Workbook
 
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         wb = Workbook()
         names = [s for s in (sheets or []) if s.strip()] or ["Sheet1"]
         wb.active.title = names[0]
@@ -67,7 +67,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     @mcp.tool
     async def sheet_read(ctx: Context, path: str, sheet: str = "") -> list[list]:
         """Read a sheet's cells as a list of rows. Defaults to the first sheet."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         return [list(row) for row in ws.iter_rows(values_only=True)]
@@ -75,7 +75,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     @mcp.tool
     async def sheet_write_cell(ctx: Context, path: str, sheet: str, cell: str, value: str) -> str:
         """Set one cell (e.g. `B2`) on a sheet and save."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         try:
@@ -88,7 +88,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     @mcp.tool
     async def sheet_append_row(ctx: Context, path: str, sheet: str, values: list) -> str:
         """Append a row of values to a sheet and save."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         ws.append(list(values))
@@ -101,28 +101,28 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     async def doc_create(ctx: Context, path: str, content: str = "") -> str:
         """Create a new `.docx` at `path`, optionally with initial text (one
         paragraph per line)."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         await _put(bot, pw, path, _docx_bytes_from_text(content))
         return f"created {path}"
 
     @mcp.tool
     async def doc_read(ctx: Context, path: str) -> str:
         """Read a `.docx` as plain text (paragraphs joined by newlines)."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         doc = _load_docx(await _get(bot, pw, path))
         return "\n".join(p.text for p in doc.paragraphs)
 
     @mcp.tool
     async def doc_write(ctx: Context, path: str, content: str) -> str:
         """Replace a `.docx`'s contents with `content` (one paragraph per line)."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         await _put(bot, pw, path, _docx_bytes_from_text(content))
         return f"wrote {path}"
 
     @mcp.tool
     async def doc_append(ctx: Context, path: str, content: str) -> str:
         """Append paragraphs (one per line) to an existing `.docx`."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         doc = _load_docx(await _get(bot, pw, path))
         for line in content.split("\n"):
             doc.add_paragraph(line)
@@ -134,7 +134,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     @mcp.tool
     async def list_files(ctx: Context, path: str = "") -> list[str]:
         """List files/folders under `path` (default the bot's root)."""
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         return await _run(nc.list_files, bot, pw, path)
 
     @mcp.tool
@@ -152,7 +152,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         """
         if permission not in ("edit", "view"):
             raise ToolError("permission must be 'edit' or 'view'")
-        bot, pw = _creds(ctx)
+        bot, pw = await _creds(ctx)
         return await _run(
             nc.create_share_link, bot, pw, path,
             permission=permission,

@@ -27,7 +27,7 @@ class _FakeCtx:
     def __init__(self, bot):
         self._bot = bot
 
-    def get_state(self, key):
+    async def get_state(self, key):  # async, like FastMCP's Context
         return {"bot": self._bot}.get(key)
 
 

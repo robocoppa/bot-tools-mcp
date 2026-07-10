@@ -32,13 +32,15 @@ ENV = {
 
 
 class _FakeState:
+    # get_state/set_state are ASYNC in FastMCP — the doubles must be too, or the
+    # tests pass while production breaks (exactly the bug that shipped once).
     def __init__(self):
         self._store = {}
 
-    def set_state(self, key, value):
+    async def set_state(self, key, value):
         self._store[key] = value
 
-    def get_state(self, key):
+    async def get_state(self, key):
         return self._store.get(key)
 
 
@@ -92,7 +94,7 @@ async def test_valid_token_passes_and_stashes_bot():
     with _with_header("Bearer tok-claudette"):
         result = await _mw().on_call_tool(ctx, _passthrough)
     assert result == "PASSED"
-    assert ctx.fastmcp_context.get_state("bot") == "claudette"
+    assert await ctx.fastmcp_context.get_state("bot") == "claudette"
 
 
 @pytest.mark.parametrize(
@@ -118,7 +120,7 @@ async def test_bearer_is_case_insensitive_scheme_but_not_token():
     ctx = _FakeCtx()
     with _with_header("bearer tok-donna"):
         await _mw().on_call_tool(ctx, _passthrough)
-    assert ctx.fastmcp_context.get_state("bot") == "donna"
+    assert await ctx.fastmcp_context.get_state("bot") == "donna"
 
     ctx = _FakeCtx()
     with _with_header("Bearer TOK-DONNA"):  # wrong-case token must fail
@@ -129,17 +131,17 @@ async def test_bearer_is_case_insensitive_scheme_but_not_token():
 # --- current_bot() helper ---
 
 
-def test_current_bot_reads_stashed_value():
+async def test_current_bot_reads_stashed_value():
     ctx = _FakeState()
-    ctx.set_state("bot", "claudette")
-    assert current_bot(ctx) == "claudette"
+    await ctx.set_state("bot", "claudette")
+    assert await current_bot(ctx) == "claudette"
 
 
-def test_current_bot_raises_when_unauthenticated():
+async def test_current_bot_raises_when_unauthenticated():
     # A tool running with no bot in context = a wiring bug; refuse to guess.
     ctx = _FakeState()
     with pytest.raises(ToolError, match="no authenticated bot"):
-        current_bot(ctx)
+        await current_bot(ctx)
 
 
 # --- /health route ---

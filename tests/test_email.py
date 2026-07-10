@@ -28,12 +28,13 @@ SMTP = SmtpConfig(host="smtp-relay.brevo.com", port=587, user="u", key="k")
 
 
 class _FakeCtx:
-    """Stands in for the request Context: get_state returns the authed bot."""
+    """Stands in for the request Context: get_state (async, like FastMCP's)
+    returns the authed bot."""
 
     def __init__(self, bot):
         self._bot = bot
 
-    def get_state(self, key):
+    async def get_state(self, key):
         return {"bot": self._bot}.get(key)
 
 

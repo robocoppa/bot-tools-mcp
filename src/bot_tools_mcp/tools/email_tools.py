@@ -46,7 +46,7 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
         Each attachment is `{"filename": str, "content_b64": str,
         "mimetype"?: str}`. Returns a short confirmation.
         """
-        bot = current_bot(ctx)
+        bot = await current_bot(ctx)
         sender = identity.from_address(bot)
 
         recipients = _clean_addresses(to, "to")

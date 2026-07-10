@@ -19,6 +19,15 @@ Companion to [PROJECT_STATE.md](PROJECT_STATE.md) and [BUILD_PLAN.md](BUILD_PLAN
 - **`.env` filled in** at `/mnt/user/appdata/bot-tools/.env` — every value from
   `.env.example`, with real per-bot tokens (`openssl rand -hex 32`).
 
+> **⚠️ Escape `$` in `.env` values.** Docker Compose runs variable substitution
+> on `env_file`, so any literal `$` in a secret (common in Nextcloud app
+> passwords) gets expanded and **blanked** — you'll see
+> `WARN … variable is not set` on `up`, and the container receives a truncated
+> password. **Double every `$` to `$$`** in `.env` (Compose collapses `$$` → one
+> literal `$`). Verify the container got the full value:
+> `docker exec bot-tools-mcp printenv NEXTCLOUD_APP_PASSWORD_<BOT>`. Alternatively,
+> regenerate app passwords without a `$` — they're disposable.
+
 ---
 
 ## Deploy
