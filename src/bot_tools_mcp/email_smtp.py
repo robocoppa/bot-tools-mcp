@@ -16,6 +16,12 @@ import os
 from dataclasses import dataclass
 from email.message import EmailMessage
 
+from bot_tools_mcp._util import BackendError, require_env
+
+
+class SmtpError(BackendError):
+    """Raised when sending through the smarthost fails; names the host:port."""
+
 
 @dataclass
 class Attachment:
@@ -47,18 +53,11 @@ class SmtpConfig:
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "SmtpConfig":
         env = os.environ if env is None else env
-
-        def req(name: str) -> str:
-            v = env.get(name)
-            if not v:
-                raise KeyError(f"required environment variable {name!r} is missing or empty")
-            return v
-
         return cls(
-            host=req("BREVO_SMTP_HOST"),
-            port=int(req("BREVO_SMTP_PORT")),
-            user=req("BREVO_SMTP_USER"),
-            key=req("BREVO_SMTP_KEY"),
+            host=require_env(env, "BREVO_SMTP_HOST"),
+            port=int(require_env(env, "BREVO_SMTP_PORT")),
+            user=require_env(env, "BREVO_SMTP_USER"),
+            key=require_env(env, "BREVO_SMTP_KEY"),
         )
 
 
@@ -117,16 +116,21 @@ def build_invite_message(
 async def send_message(msg: EmailMessage, config: SmtpConfig) -> None:
     """Send an assembled message through the smarthost (STARTTLS on 587).
 
+    Any transport failure is raised as `SmtpError` naming the smarthost, so the
+    tool layer surfaces a clear message without each tool re-formatting host:port.
     Imported lazily so the module (and its tests) don't hard-require aiosmtplib
     to be importable at collection time in odd environments.
     """
     import aiosmtplib
 
-    await aiosmtplib.send(
-        msg,
-        hostname=config.host,
-        port=config.port,
-        username=config.user,
-        password=config.key,
-        start_tls=True,
-    )
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=config.host,
+            port=config.port,
+            username=config.user,
+            password=config.key,
+            start_tls=True,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface loudly, named
+        raise SmtpError(f"email send failed via {config.host}:{config.port}: {exc}") from exc

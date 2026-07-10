@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
+from bot_tools_mcp._util import to_tool_error
 from bot_tools_mcp.email_smtp import (
     Attachment,
     SmtpConfig,
@@ -61,11 +62,9 @@ def register(mcp: FastMCP, identity: Identity, smtp: SmtpConfig | None = None):
             attachments=atts,
         )
         try:
-            await send_message(msg, smtp_config)
-        except Exception as exc:  # fail loud, name the smarthost, don't swallow
-            raise ToolError(
-                f"email send failed via {smtp_config.host}:{smtp_config.port}: {exc}"
-            ) from exc
+            await send_message(msg, smtp_config)  # raises SmtpError naming the host
+        except Exception as exc:
+            raise to_tool_error(exc) from exc
 
         return f"sent from {sender} to {', '.join(recipients)}"
 

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import os
 
+from bot_tools_mcp._util import require_env
+
 # Env-var prefixes. The bot name is the suffix, lower-cased.
 _TOKEN_PREFIX = "BOT_TOKEN_"
 _RADICALE_PASS_PREFIX = "RADICALE_PASS_"
@@ -102,7 +104,4 @@ class Identity:
 
     def _require(self, key: str) -> str:
         """Fetch a required env var, failing loudly (never silently empty)."""
-        value = self._env.get(key)
-        if not value:
-            raise KeyError(f"required environment variable {key!r} is missing or empty")
-        return value
+        return require_env(self._env, key)

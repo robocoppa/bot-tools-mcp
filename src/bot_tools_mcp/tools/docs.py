@@ -19,8 +19,9 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
 from bot_tools_mcp import nextcloud_client as nc
+from bot_tools_mcp._util import to_tool_error
 from bot_tools_mcp.identity import Identity
-from bot_tools_mcp.server import current_bot
+from bot_tools_mcp.server import bot_creds
 
 
 def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = None):
@@ -31,17 +32,20 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     )
 
     def _creds(ctx: Context) -> tuple[str, str]:
-        bot = current_bot(ctx)
-        return bot, identity.nextcloud_password(bot)
+        return bot_creds(ctx, identity.nextcloud_password)
+
+    async def _run(fn, *args, **kwargs):
+        """Run a sync Nextcloud transport op in a thread, surfacing failures loud."""
+        try:
+            return await asyncio.to_thread(fn, config, *args, **kwargs)
+        except Exception as exc:
+            raise to_tool_error(exc) from exc
 
     async def _get(bot, pw, path) -> bytes:
-        return await asyncio.to_thread(nc.get_file, config, bot, pw, path)
+        return await _run(nc.get_file, bot, pw, path)
 
     async def _put(bot, pw, path, data) -> None:
-        await asyncio.to_thread(nc.put_file, config, bot, pw, path, data)
-
-    def _guard(exc: Exception) -> ToolError:
-        return exc if isinstance(exc, ToolError) else ToolError(str(exc))
+        await _run(nc.put_file, bot, pw, path, data)
 
     # --- spreadsheets (openpyxl) ---
 
@@ -57,22 +61,14 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         wb.active.title = names[0]
         for name in names[1:]:
             wb.create_sheet(name)
-        data = _dump_xlsx(wb)
-        try:
-            await _put(bot, pw, path, data)
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _dump_xlsx(wb))
         return f"created {path}"
 
     @mcp.tool
     async def sheet_read(ctx: Context, path: str, sheet: str = "") -> list[list]:
         """Read a sheet's cells as a list of rows. Defaults to the first sheet."""
         bot, pw = _creds(ctx)
-        try:
-            data = await _get(bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
-        wb = _load_xlsx(data)
+        wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         return [list(row) for row in ws.iter_rows(values_only=True)]
 
@@ -80,37 +76,23 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     async def sheet_write_cell(ctx: Context, path: str, sheet: str, cell: str, value: str) -> str:
         """Set one cell (e.g. `B2`) on a sheet and save."""
         bot, pw = _creds(ctx)
-        try:
-            data = await _get(bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
-        wb = _load_xlsx(data)
+        wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         try:
             ws[cell] = value
         except ValueError as exc:
             raise ToolError(f"invalid cell reference {cell!r}: {exc}") from exc
-        try:
-            await _put(bot, pw, path, _dump_xlsx(wb))
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _dump_xlsx(wb))
         return f"set {sheet}!{cell} in {path}"
 
     @mcp.tool
     async def sheet_append_row(ctx: Context, path: str, sheet: str, values: list) -> str:
         """Append a row of values to a sheet and save."""
         bot, pw = _creds(ctx)
-        try:
-            data = await _get(bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
-        wb = _load_xlsx(data)
+        wb = _load_xlsx(await _get(bot, pw, path))
         ws = _pick_sheet(wb, sheet)
         ws.append(list(values))
-        try:
-            await _put(bot, pw, path, _dump_xlsx(wb))
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _dump_xlsx(wb))
         return f"appended a row to {sheet} in {path}"
 
     # --- documents (python-docx) ---
@@ -120,54 +102,31 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         """Create a new `.docx` at `path`, optionally with initial text (one
         paragraph per line)."""
         bot, pw = _creds(ctx)
-        doc = _new_docx()
-        for line in content.split("\n") if content else []:
-            doc.add_paragraph(line)
-        try:
-            await _put(bot, pw, path, _dump_docx(doc))
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _docx_bytes_from_text(content))
         return f"created {path}"
 
     @mcp.tool
     async def doc_read(ctx: Context, path: str) -> str:
         """Read a `.docx` as plain text (paragraphs joined by newlines)."""
         bot, pw = _creds(ctx)
-        try:
-            data = await _get(bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
-        doc = _load_docx(data)
+        doc = _load_docx(await _get(bot, pw, path))
         return "\n".join(p.text for p in doc.paragraphs)
 
     @mcp.tool
     async def doc_write(ctx: Context, path: str, content: str) -> str:
         """Replace a `.docx`'s contents with `content` (one paragraph per line)."""
         bot, pw = _creds(ctx)
-        doc = _new_docx()
-        for line in content.split("\n"):
-            doc.add_paragraph(line)
-        try:
-            await _put(bot, pw, path, _dump_docx(doc))
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _docx_bytes_from_text(content))
         return f"wrote {path}"
 
     @mcp.tool
     async def doc_append(ctx: Context, path: str, content: str) -> str:
         """Append paragraphs (one per line) to an existing `.docx`."""
         bot, pw = _creds(ctx)
-        try:
-            data = await _get(bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
-        doc = _load_docx(data)
+        doc = _load_docx(await _get(bot, pw, path))
         for line in content.split("\n"):
             doc.add_paragraph(line)
-        try:
-            await _put(bot, pw, path, _dump_docx(doc))
-        except Exception as exc:
-            raise _guard(exc) from exc
+        await _put(bot, pw, path, _dump_docx(doc))
         return f"appended to {path}"
 
     # --- listing + sharing ---
@@ -176,10 +135,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
     async def list_files(ctx: Context, path: str = "") -> list[str]:
         """List files/folders under `path` (default the bot's root)."""
         bot, pw = _creds(ctx)
-        try:
-            return await asyncio.to_thread(nc.list_files, config, bot, pw, path)
-        except Exception as exc:
-            raise _guard(exc) from exc
+        return await _run(nc.list_files, bot, pw, path)
 
     @mcp.tool
     async def create_share_link(
@@ -197,15 +153,12 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         if permission not in ("edit", "view"):
             raise ToolError("permission must be 'edit' or 'view'")
         bot, pw = _creds(ctx)
-        try:
-            return await asyncio.to_thread(
-                nc.create_share_link, config, bot, pw, path,
-                permission=permission,
-                expiry=expiry or None,
-                share_password=password or None,
-            )
-        except Exception as exc:
-            raise _guard(exc) from exc
+        return await _run(
+            nc.create_share_link, bot, pw, path,
+            permission=permission,
+            expiry=expiry or None,
+            share_password=password or None,
+        )
 
     return {
         "sheet_create": sheet_create,
@@ -247,10 +200,18 @@ def _pick_sheet(wb, sheet: str):
     return wb[sheet]
 
 
-def _new_docx():
+def _docx_bytes_from_text(content: str) -> bytes:
+    """Build a fresh .docx from text (one paragraph per line) and serialize it.
+
+    Shared by doc_create and doc_write — both start from an empty document and
+    lay down the given lines. Empty content yields an empty document.
+    """
     from docx import Document
 
-    return Document()
+    doc = Document()
+    for line in content.split("\n") if content else []:
+        doc.add_paragraph(line)
+    return _dump_docx(doc)
 
 
 def _load_docx(data: bytes):

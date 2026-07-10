@@ -77,21 +77,19 @@ curl -sS http://192.168.1.11:9110/health          # → ok
 ### 2. Auth — bad tokens are rejected, discovery is open
 
 Tool discovery (`tools/list`) is intentionally open; tool *calls* require a
-valid token. First, a bad token must NOT be able to call a tool. The cleanest
-check is with an MCP client, but you can prove auth with raw JSON-RPC:
+valid token. So the check is: no token → still lists the 15 tools; a bad token
+→ cannot call a tool.
+
+Don't try to do this with raw `curl` — the streamable-HTTP transport needs a
+session handshake that's painful by hand. Use this tiny MCP client script
+instead (run it on the **laptop**, where Python + the fastmcp client are
+available). Save it once, then reuse it for every test below:
 
 ```bash
-# initialize + list tools with NO token — should succeed (discovery is open)
-# and show 15 tools. Use an MCP client (below) — raw curl needs the session
-# handshake, which is fiddly.
-```
-
-The reliable way is a tiny MCP client script (run on the laptop, where Python +
-the fastmcp client are available):
-
-```bash
-# save as smoke_client.py
-cat > smoke_client.py <<'PY'
+# write the throwaway client to a tmp dir (not your working dir), and keep a
+# handle to it so the commands below stay short:
+SMOKE="$(mktemp -d)/smoke_client.py"
+cat > "$SMOKE" <<'PY'
 import asyncio, json, os, sys
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
@@ -114,12 +112,16 @@ async def main():
 
 asyncio.run(main())
 PY
+echo "wrote $SMOKE"
+
+# Run everything below in THIS same shell so $SMOKE (and $BOT_TOKEN_*) stay set.
+# The tmp dir is disposable — it's gone on reboot, or delete it when done.
 
 # a) discovery with no token → 15 tool names
-uv run --with fastmcp python smoke_client.py
+uv run --with fastmcp python "$SMOKE"
 
 # b) a tool call with a BAD token → AuthorizationError
-TOKEN=WRONG uv run --with fastmcp python smoke_client.py \
+TOKEN=WRONG uv run --with fastmcp python "$SMOKE" \
   send_email '{"to":["you@yourdomain"],"subject":"x","body":"x"}'
 #   → should raise "unknown or missing bot token", NOT send
 ```
@@ -130,7 +132,7 @@ mail, stop — the gate is broken.
 ### 3. Email — `send_email` lands in the inbox, From the right bot
 
 ```bash
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   send_email '{"to":["<a mailbox you own>"],"subject":"bot-tools smoke","body":"hi from claudette"}'
 ```
 
@@ -141,18 +143,18 @@ pass. This closes the loop with Stage 1 through the real tool path.
 
 ```bash
 # create → prints an event_id
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   create_event '{"title":"Smoke test","start":"2026-07-15T15:00:00","end":"2026-07-15T15:30:00"}'
 
 # list → should include it, with the same event_id
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py list_events '{}'
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" list_events '{}'
 
 # delete → pass the event_id back
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   delete_event '{"event_id":"<the id from create>"}'
 
 # invite → saves to the calendar AND emails a .ics (method=REQUEST)
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   send_calendar_invite '{"to":["<a mailbox you own>"],"title":"Smoke invite","start":"2026-07-16T10:00:00","end":"2026-07-16T10:30:00"}'
 ```
 
@@ -164,24 +166,24 @@ accept/decline), From `claudette@…`.
 
 ```bash
 # a spreadsheet: create, write a cell, read it back
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   sheet_create '{"path":"smoke.xlsx","sheets":["Data"]}'
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   sheet_write_cell '{"path":"smoke.xlsx","sheet":"Data","cell":"A1","value":"hello"}'
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   sheet_read '{"path":"smoke.xlsx","sheet":"Data"}'      # → [["hello"]]
 
 # a document
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   doc_create '{"path":"smoke.docx","content":"first line"}'
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   doc_read '{"path":"smoke.docx"}'                        # → "first line"
 
 # list the bot's files
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py list_files '{}'
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" list_files '{}'
 
 # a public, editable share link
-TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_CLAUDETTE" uv run --with fastmcp python "$SMOKE" \
   create_share_link '{"path":"smoke.xlsx","permission":"edit"}'
 #   → https://cloud.<domain>/s/TOKEN
 ```
@@ -195,7 +197,7 @@ now driven by the tool.
 
 ```bash
 # claudette's file must NOT be readable as donna
-TOKEN="$BOT_TOKEN_DONNA" uv run --with fastmcp python smoke_client.py \
+TOKEN="$BOT_TOKEN_DONNA" uv run --with fastmcp python "$SMOKE" \
   doc_read '{"path":"smoke.docx"}'
 #   → "file not found" (donna has her own root; she can't see claudette's file)
 ```
@@ -205,8 +207,12 @@ TOKEN="$BOT_TOKEN_DONNA" uv run --with fastmcp python smoke_client.py \
 ### Cleanup
 
 ```bash
-# remove the smoke files as claudette (or just leave them)
-# (there's no delete_file tool in v1; delete via the Nextcloud web UI if wanted)
+# the smoke_client.py lives in a tmp dir — it clears on reboot, or:
+rm -rf "$(dirname "$SMOKE")"
+
+# the smoke files created on the backends (smoke.xlsx/.docx, the test event)
+# aren't removed by any v1 tool — delete them via the Nextcloud web UI and the
+# Radicale/calendar client if you want a clean slate.
 ```
 
 ---
@@ -231,11 +237,13 @@ in `audrey_ai_2.0/docs/plans/bot-tools/`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `/health` unreachable | container down, or 9110 not published | `docker compose ps`; check `ports:` in compose |
-| every tool call → auth error even with a good token | token in `.env` doesn't match what the bot sends, or `.env` not loaded into the container | `docker compose exec bot-tools-mcp env \| grep BOT_TOKEN`; `--force-recreate` after `.env` edits |
+| **every** tool call → "unknown or missing bot token", even with the container's own token | (1) container running old image/env: rebuild+recreate needed; (2) token in `.env` differs from what's sent; (3) `.env` not loaded | `docker exec bot-tools-mcp printenv BOT_TOKEN_<BOT>` to see what it loaded; `docker compose up -d --build --force-recreate bot-tools-mcp`. NB: the server reads the bearer with `get_http_headers(include_all=True)` — without that flag FastMCP strips `authorization` and rejects everything (fixed, but the symptom to recognize). |
+| compose WARN `The "XXXX" variable is not set. Defaulting to a blank string` | some line in `.env` contains a literal `$`, so Compose tries to expand `$XXXX` and blanks it — which **corrupts whatever secret that `$` is inside**. (A trailing `$` in `cat -A` output is just the newline marker, not this — this is Compose parsing the file.) | Confirm it's actually truncating: compare `grep KEY .env \| wc -c` with `docker exec bot-tools-mcp printenv KEY \| wc -c` — if the container's is shorter, Compose ate part of it. Fix: escape each `$` as `$$` in `.env`, or regenerate that credential without a `$` |
 | `send_email` fails, names the smarthost | Brevo creds wrong / SMTP key rotated | re-check `BREVO_SMTP_*` in `.env` |
 | email lands in **spam** | DKIM/SPF/DMARC drift | re-verify the Stage-1 DNS records |
 | calendar op → "has no calendar" | the bot's Radicale calendar wasn't created, or wrong per-bot password | create it in the Radicale web UI (Stage 2); check `RADICALE_PASS_<BOT>` |
 | docs op → connection/TLS error naming `cloud.<domain>` | a backend call hit the **public** URL (hairpin) | `NEXTCLOUD_URL` must be the **internal** `http://nextcloud:80` |
+| docs/Nextcloud op → 401/auth failure but token was accepted | the Nextcloud app password is `$`-corrupted (see the compose WARN row) or wrong | verify with `docker exec ... printenv NEXTCLOUD_APP_PASSWORD_<BOT>`; escape `$$` or regenerate |
 | `create_share_link` → OCS rejected | Nextcloud sharing disabled, or file owned by a different bot | share the file as its owner; enable link shares in Nextcloud |
 | share link opens but won't edit | Collabora/WOPI issue, not the MCP server | see the Stage-3 lessons-learned doc |
 

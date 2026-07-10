@@ -15,11 +15,10 @@ server-side), but we don't rely on the server alone.
 
 from __future__ import annotations
 
-import posixpath
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from fastmcp.exceptions import ToolError
+from bot_tools_mcp._util import BackendError, safe_path
 
 # OCS share bitmask (Nextcloud normalizes on return; we assert on capability).
 PERM_READ = 1
@@ -27,29 +26,8 @@ PERM_EDIT = 1 | 2 | 4 | 8 | 16  # read+update+create+delete+share = 31; edit lin
 SHARE_TYPE_PUBLIC_LINK = 3
 
 
-class NextcloudError(RuntimeError):
+class NextcloudError(BackendError):
     """Raised on any WebDAV/OCS failure; message names the operation + status."""
-
-
-def safe_path(path: str) -> str:
-    """Normalize a bot-supplied path to a clean relative path, or raise.
-
-    Rejects absolute paths and any `..` segment. Returns a path with no leading
-    slash, suitable to append to the bot's WebDAV root.
-    """
-    if path is None:
-        raise ToolError("'path' is required")
-    raw = path.strip()
-    if not raw:
-        raise ToolError("'path' is required")
-    if raw.startswith("/") or raw.startswith("\\"):
-        raise ToolError(f"'path' must be relative, not absolute: {path!r}")
-    # Normalize and re-check — catches ../ anywhere, including after a segment.
-    normalized = posixpath.normpath(raw)
-    parts = normalized.split("/")
-    if ".." in parts or normalized.startswith("/"):
-        raise ToolError(f"'path' must not escape the bot's root: {path!r}")
-    return normalized.lstrip("./") or normalized
 
 
 @dataclass
@@ -61,7 +39,9 @@ class NextcloudConfig:
 
 
 def _dav_url(cfg: NextcloudConfig, bot: str, path: str) -> str:
-    clean = safe_path(path)
+    # An empty/blank path addresses the bot's root (used by list_files); any
+    # non-empty path is validated against traversal.
+    clean = safe_path(path) if path and path.strip() else ""
     encoded = quote(clean)
     return f"{cfg.internal_url}/remote.php/dav/files/{bot}/{encoded}"
 
@@ -111,10 +91,7 @@ def file_exists(cfg: NextcloudConfig, bot: str, password: str, path: str) -> boo
 
 def list_files(cfg: NextcloudConfig, bot: str, password: str, path: str = "") -> list[str]:
     """PROPFIND (depth 1) under a folder; return child paths relative to the root."""
-    # An empty path lists the bot's root.
-    clean = safe_path(path) if path.strip() else ""
-    encoded = quote(clean)
-    url = f"{cfg.internal_url}/remote.php/dav/files/{bot}/{encoded}"
+    url = _dav_url(cfg, bot, path)  # empty path → the bot's root
     with _client(bot, password) as c:
         resp = c.request("PROPFIND", url, headers={"Depth": "1"})
     if resp.status_code == 404:
@@ -170,8 +147,8 @@ def create_share_link(
     (that's its whole purpose — a link for a human); the request itself goes to
     the internal host.
     """
-    if permission not in ("edit", "view"):
-        raise ToolError("permission must be 'edit' or 'view'")
+    # The tool layer validates `permission` ∈ {edit, view}; here we just map it
+    # (anything other than "edit" → read-only, a safe default).
     clean = safe_path(path)
     perms = PERM_EDIT if permission == "edit" else PERM_READ
 

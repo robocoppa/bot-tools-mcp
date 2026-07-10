@@ -189,13 +189,17 @@ async def test_invite_requires_an_attendee(monkeypatch):
 
 
 async def test_invite_reports_email_failure_loud(monkeypatch):
+    # The event WAS saved; the email failed — the message must say both, and
+    # send_message's SmtpError already names the smarthost.
+    from bot_tools_mcp.email_smtp import SmtpError
+
     tools, _, _ = _tools(monkeypatch)
 
     async def boom(msg, config):
-        raise ConnectionError("refused")
+        raise SmtpError(f"email send failed via {config.host}:{config.port}: refused")
 
     monkeypatch.setattr(calendar_tools, "send_message", boom)
-    with pytest.raises(ToolError, match="invite saved but email failed via smtp-relay.brevo.com:587"):
+    with pytest.raises(ToolError, match="invite saved but email send failed via smtp-relay.brevo.com:587"):
         await tools["send_calendar_invite"](
             _FakeCtx("claudette"), to=["a@example.com"], title="x",
             start="2026-07-10T15:00", end="2026-07-10T16:00",

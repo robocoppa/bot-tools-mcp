@@ -22,6 +22,8 @@ from datetime import datetime, timezone
 from icalendar import Calendar as ICalendar
 from icalendar import Event as IEvent
 
+from bot_tools_mcp._util import BackendError
+
 
 @dataclass
 class CalEvent:
@@ -35,7 +37,7 @@ class CalEvent:
     location: str = ""
 
 
-class CalDavError(RuntimeError):
+class CalDavError(BackendError):
     """Raised when a CalDAV operation fails; message names the server."""
 
 

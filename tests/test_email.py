@@ -154,8 +154,11 @@ async def test_malformed_attachment_is_rejected(monkeypatch):
 
 
 async def test_send_failure_is_surfaced_not_swallowed(monkeypatch):
+    # send_message names the smarthost (SmtpError); the tool surfaces it loud.
+    from bot_tools_mcp.email_smtp import SmtpError
+
     async def boom(msg, config):
-        raise ConnectionError("connection refused")
+        raise SmtpError(f"email send failed via {config.host}:{config.port}: refused")
 
     monkeypatch.setattr(email_tools, "send_message", boom)
     tool = email_tools.register(FastMCP("t"), Identity(ENV), SMTP)

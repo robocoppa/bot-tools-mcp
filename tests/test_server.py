@@ -66,6 +66,24 @@ def _with_no_headers():
     return patch("bot_tools_mcp.server.get_http_headers", return_value={})
 
 
+# --- regression: the header accessor MUST include sensitive headers ---
+
+
+def test_bearer_reader_requests_sensitive_headers():
+    """get_http_headers() strips `authorization` by default — the reader MUST
+    pass include_all=True, or the token never arrives and every call is rejected.
+    This guards the exact production bug the mocked auth tests could not catch.
+    """
+    from unittest.mock import MagicMock
+
+    from bot_tools_mcp.server import _bearer_from_headers
+
+    fake = MagicMock(return_value={"authorization": "Bearer tok-donna"})
+    with patch("bot_tools_mcp.server.get_http_headers", fake):
+        assert _bearer_from_headers() == "tok-donna"
+    fake.assert_called_once_with(include_all=True)
+
+
 # --- auth gate (fires on every tool call) ---
 
 

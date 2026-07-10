@@ -26,8 +26,13 @@ _BOT_STATE_KEY = "bot"
 
 
 def _bearer_from_headers() -> str | None:
-    """Pull the bearer token out of the current request's Authorization header."""
-    auth = get_http_headers().get("authorization", "")
+    """Pull the bearer token out of the current request's Authorization header.
+
+    `include_all=True` is REQUIRED: get_http_headers() strips `authorization`
+    (and other sensitive headers) by default, so without it the token never
+    reaches us and every call is rejected as "unknown or missing bot token".
+    """
+    auth = get_http_headers(include_all=True).get("authorization", "")
     if not auth.lower().startswith("bearer "):
         return None
     return auth[len("bearer "):].strip() or None
@@ -67,6 +72,17 @@ def current_bot(ctx) -> str:
     if not bot:
         raise ToolError("no authenticated bot in context")
     return bot
+
+
+def bot_creds(ctx, password_for) -> tuple[str, str]:
+    """Return (bot, password) for the authenticated bot, using the given per-bot
+    password accessor (e.g. `identity.radicale_password`).
+
+    The single place tools derive backend credentials from the authed bot —
+    keeps that security-critical step out of each tool module.
+    """
+    bot = current_bot(ctx)
+    return bot, password_for(bot)
 
 
 def create_server(identity: Identity | None = None, *, register_tools: bool = True) -> FastMCP:

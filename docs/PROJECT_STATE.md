@@ -22,6 +22,32 @@ the shared server that turns those three backends into per-bot tools.
 
 ## ▶ Status
 
+### 2026-07-10 — First box deploy: fixed a real auth bug (header stripping)
+
+Deployed to the box; the very first authenticated call failed with "unknown or
+missing bot token" **even using the container's own loaded token over localhost**
+— which ruled out the token value, the network, and stale env, and pointed at the
+server. Instrumented the live middleware and found: **`get_http_headers()` strips
+`authorization` by default**, so the bearer never reached the auth gate — every
+call was rejected. Fix: `get_http_headers(include_all=True)` in
+`_bearer_from_headers`. The unit tests missed it because they mocked
+`get_http_headers` to return the header regardless of args; added a **regression
+test** asserting `include_all=True` is passed. Verified live: header now arrives,
+token resolves, bot stashed. **83 tests green, ruff clean.**
+
+Also seen box-side: a Compose WARN `The "ZCzDKDf7E" variable is not set` on
+`up`, meaning a literal `$` somewhere in `.env` triggers Compose variable-
+substitution and blanks that fragment. (NOT the same as the trailing-`$` cat -A
+display artifact — this is Compose parsing the file.) To confirm it's actually
+truncating a secret: compare `grep KEY .env | wc -c` vs `docker exec … printenv
+KEY | wc -c`; if shorter, escape `$$` or regenerate. Documented in the deploy-doc
+troubleshooting table.
+
+**Next:** ship this fix to the box (rebuild + force-recreate), fix the `$` in the
+Nextcloud passwords, then re-run smoke tests from step 3 (real `send_email`).
+
+_Earlier:_
+
 ### 2026-07-09 — Full Stage 4 built: all 15 tools, packaged, 82 tests green
 
 The whole v1 tool contract is implemented and hermetically tested. **Not yet
@@ -42,6 +68,10 @@ deployed to the box** — next action is the live smoke test (see
   `[project.scripts] bot-tools-mcp`. `run()` honors `MCP_HOST`/`MCP_PORT`.
 - **Tests: 82 green, ruff clean.** Includes the no-spoof tests, path-traversal
   rejection, per-bot isolation, and "no backend call uses the public URL."
+- **Verified over the wire** (live server + real FastMCP `StreamableHttpTransport`
+  client): discovery open without a token, a bad token calling a tool is rejected,
+  a good token passes auth and the tool executes. The smoke-test doc's client
+  script (transport-level `headers=`) is confirmed against a running server.
 
 Docs: [DEPLOY_AND_SMOKE_TEST.md](DEPLOY_AND_SMOKE_TEST.md) — box deploy +
 layered live smoke tests (health → auth → each tool) + troubleshooting.
