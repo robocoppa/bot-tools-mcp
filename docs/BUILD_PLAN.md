@@ -2,7 +2,8 @@
 
 _The execution roadmap for building this server tool-by-tool, hermetically, then
 deploying it. Companion to [PROJECT_STATE.md](PROJECT_STATE.md) (current status)
-and the plan-of-record in `audrey_ai_2.0/docs/plans/bot-tools/stage-4-mcp-server.md`._
+and the plan-of-record in
+[plans/bot-tools/stage-4-mcp-server.md](plans/bot-tools/stage-4-mcp-server.md)._
 
 Each step is: build the transport layer (identity-free, mockable) → build the
 tool layer (reads the authed bot, no identity params) → write mocked-backend
@@ -90,7 +91,8 @@ _Original detail:_
   per-bot tokens), placeholders only. Real `.env` stays on the box.
 
 ### ⬜ 5. Deploy + live verify (box)
-Folds into `audrey_ai_2.0/docs/plans/bot-tools/` compose. On the box:
+Uses this repo's `compose.yaml` (see [DEPLOY_AND_SMOKE_TEST.md](DEPLOY_AND_SMOKE_TEST.md)).
+On the box:
 - `docker compose up -d --build bot-tools-mcp`; confirm healthy at `:9110`.
 - Bad token rejected; valid token lists + calls tools.
 - Live `send_email` as `claudette` → inbox From `claudette@builtryte.xyz`.

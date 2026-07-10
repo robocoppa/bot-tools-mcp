@@ -5,10 +5,10 @@ _Single continuity file for this repo. Read this first when resuming. Update the
 entry on top._
 
 This is the **MCP server** half of the larger `bot-tools` workstream. The backend
-deploy stages (Brevo email, Radicale calendar, Nextcloud + Collabora docs) live
-in the `audrey_ai_2.0` repo under `docs/plans/bot-tools/` (gitignored, laptop
-+ box). Stages 0–3 there are **done and verified**; this repo is **Stage 4**:
-the shared server that turns those three backends into per-bot tools.
+deploy stages (Brevo email, Radicale calendar, Nextcloud + Collabora docs) and
+all build/deploy plans live in this repo under `docs/plans/` (gitignored,
+laptop-local). Stages 0–3 are **done and verified**; Stage 4 (this server) is
+**done and live on the box**; Stage 5 (wiring the bots) is next.
 
 > **Continuity note — keep audrey's PROJECT_STATE light on this.**
 > `audrey_ai_2.0/docs/PROJECT_STATE.md` should carry only a **brief, general
@@ -44,7 +44,7 @@ bring-up (auth header stripping; async `Context.get_state`) — see entries belo
 
 **Stage 4 complete. Next: Stage 5 — wire the bots** (each bot's `mcp_servers:`
 config → `http://192.168.1.11:9110/mcp` with its own `BOT_TOKEN`), in the
-`audrey_ai_2.0/docs/plans/bot-tools/stage-5-wire-bots.md` plan.
+[plans/bot-tools/stage-5-wire-bots.md](plans/bot-tools/stage-5-wire-bots.md) plan.
 
 _Earlier the same day:_
 
@@ -176,9 +176,10 @@ then compose + box deploy + live verify.
 | **Box deploy + live smoke test** | on Unraid | ⬜ next |
 | Wire the bots (Stage 5) | bots' `mcp_servers:` config | ⬜ |
 
-Backend deploy docs (the other repo): `audrey_ai_2.0/docs/plans/bot-tools/`
-— `stage-{1,2,3}-*.md` (done), `stage-4-mcp-server.md` (this repo's plan of
-record), `stage-5-wire-bots.md` (bots' `mcp_servers:` config).
+Backend + build plans (now in this repo, gitignored): `docs/plans/bot-tools/`
+— `stage-{0,1,2,3}-*.md` (backend deploys, done), `stage-4-mcp-server.md`
+(this server's plan of record), `stage-5-wire-bots.md` (bots' `mcp_servers:`
+config). Master plan: `docs/plans/bot-workspace-tools-plan.md`.
 
 ## Non-negotiables (carried from the backend stages)
 

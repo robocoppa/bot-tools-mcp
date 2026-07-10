@@ -2,6 +2,12 @@
 # Never commit. Ship .env.example as the template; keep the real .env on the box.
 .env
 
+# Laptop-local build/deploy plans (contain the real domain, LAN IP, bot names,
+# and deploy specifics — kept private, same as when they lived in audrey). The
+# tracked continuity docs (PROJECT_STATE / BUILD_PLAN / DEPLOY_AND_SMOKE_TEST)
+# stay committed; only docs/plans/ is ignored.
+docs/plans/
+
 # Python
 __pycache__/
 *.pyc
