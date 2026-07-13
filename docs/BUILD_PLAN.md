@@ -3,7 +3,7 @@
 _The execution roadmap for building this server tool-by-tool, hermetically, then
 deploying it. Companion to [PROJECT_STATE.md](PROJECT_STATE.md) (current status)
 and the plan-of-record in
-[plans/bot-tools/stage-4-mcp-server.md](plans/bot-tools/stage-4-mcp-server.md)._
+[plans/stage-4-mcp-server.md](plans/stage-4-mcp-server.md)._
 
 Each step is: build the transport layer (identity-free, mockable) → build the
 tool layer (reads the authed bot, no identity params) → write mocked-backend
@@ -90,24 +90,22 @@ _Original detail:_
 - `.env.example`: the full var contract (Brevo, per-bot Radicale/Nextcloud,
   per-bot tokens), placeholders only. Real `.env` stays on the box.
 
-### ⬜ 5. Deploy + live verify (box)
-Uses this repo's `compose.yaml` (see [DEPLOY_AND_SMOKE_TEST.md](DEPLOY_AND_SMOKE_TEST.md)).
-On the box:
-- `docker compose up -d --build bot-tools-mcp`; confirm healthy at `:9110`.
-- Bad token rejected; valid token lists + calls tools.
-- Live `send_email` as `claudette` → inbox From `claudette@builtryte.xyz`.
-- `send_calendar_invite` → Radicale event + `.ics` email.
-- `create_share_link` → working `cloud.builtryte.xyz/s/…`.
-- Record as-built in the stage-4 deploy log.
+### ✅ 5. Deploy + live verify (box)
+Done 2026-07-10. Deployed via this repo's `compose.yaml`; all 6 smoke tests pass
+(see [DEPLOY_AND_SMOKE_TEST.md](DEPLOY_AND_SMOKE_TEST.md) + PROJECT_STATE). Two
+prod bugs fixed during bring-up: auth header stripping (`include_all=True`) and
+async `Context.get_state`/`set_state` (must `await`). `.env` `$` → `$$` escape.
 
-### ⬜ 6. Wire the bots (Stage 5, other repo)
+### ⬜ 6. Wire the bots (Stage 5)
 Each bot's runtime gets an `mcp_servers:` entry pointing at
 `http://192.168.1.11:9110/mcp` with its own `BOT_TOKEN`. See
-`stage-5-wire-bots.md`.
+[plans/stage-5-wire-bots.md](plans/stage-5-wire-bots.md).
+The real proof: one bot (Claudette) calls a tool through its own runtime, not
+the `sc` smoke helper.
 
 ## Definition of done (whole server)
 
-- [ ] Hermetic suite green (incl. the no-spoof + path-traversal tests).
-- [ ] Container healthy + LAN-reachable at `:9110/mcp`.
-- [ ] Each tool proven live against its real backend, scoped per-bot.
-- [ ] At least one bot wired and calling a tool end-to-end.
+- [x] Hermetic suite green (83 tests, incl. no-spoof + path-traversal).
+- [x] Container healthy + LAN-reachable at `:9110/mcp`.
+- [x] Each tool proven live against its real backend, scoped per-bot.
+- [ ] At least one bot wired and calling a tool end-to-end (Stage 5).

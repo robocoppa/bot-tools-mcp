@@ -138,6 +138,19 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         return await _run(nc.list_files, bot, pw, path)
 
     @mcp.tool
+    async def delete_file(ctx: Context, path: str) -> str:
+        """Delete a file the bot owns from its Nextcloud files.
+
+        The file is moved to the bot's Nextcloud trash (recoverable from
+        Files → Deleted files), not permanently destroyed. Only the calling
+        bot's own files are reachable; `path` must be relative and cannot
+        escape the bot's root. Fails clearly if the file does not exist.
+        """
+        bot, pw = await _creds(ctx)
+        await _run(nc.delete_file, bot, pw, path)
+        return f"deleted {path}"
+
+    @mcp.tool
     async def create_share_link(
         ctx: Context,
         path: str,
@@ -170,6 +183,7 @@ def register(mcp: FastMCP, identity: Identity, cfg: nc.NextcloudConfig | None = 
         "doc_write": doc_write,
         "doc_append": doc_append,
         "list_files": list_files,
+        "delete_file": delete_file,
         "create_share_link": create_share_link,
     }
 

@@ -22,6 +22,28 @@ laptop-local). Stages 0–3 are **done and verified**; Stage 4 (this server) is
 
 ## ▶ Status
 
+### 2026-07-10 — docs/ reorganized (flatter plans/, added docs index)
+
+Tidied the docs tree — no content lost, tracked-vs-gitignored boundary unchanged:
+- **Flattened `plans/`.** Dropped the redundant `plans/bot-tools/` nesting; the
+  stage docs now live directly under `docs/plans/`. The master plan is
+  `docs/plans/MASTER_PLAN.md` (was `bot-workspace-tools-plan.md`), and the
+  stage-3 lessons doc is now `stage-3-appendix-lessons-learned.md` so it reads as
+  the appendix it is, not a peer stage.
+- **Added `docs/README.md`** — a tracked index of every doc and the
+  tracked (`docs/*.md`) vs gitignored (`docs/plans/**`) split.
+- All cross-references updated. **No code change; Stage 4 status below unchanged.**
+
+### 2026-07-10 — All bot-tools plan docs consolidated into THIS repo
+
+The 8 stage docs + master plan moved here from `audrey_ai_2.0` into
+`docs/plans/` (gitignored, laptop-local — same privacy as before; they hold the
+domain/LAN-IP/bot-names). So this repo is now the single home for everything
+bot-tools: tracked continuity docs (`docs/*.md`) + gitignored plans
+(`docs/plans/`). Cross-refs fixed; audrey's `docs/plans/` is now purely audrey.
+Open Cursor at `~/Documents/github` to see both repos side-by-side. **No code
+change; Stage 4 status below is unchanged.**
+
 ### 2026-07-10 — STAGE 4 DONE ✅ — all 6 smoke tests pass on the box
 
 The MCP server is live on the box and **every tool is verified end-to-end** with
@@ -44,7 +66,7 @@ bring-up (auth header stripping; async `Context.get_state`) — see entries belo
 
 **Stage 4 complete. Next: Stage 5 — wire the bots** (each bot's `mcp_servers:`
 config → `http://192.168.1.11:9110/mcp` with its own `BOT_TOKEN`), in the
-[plans/bot-tools/stage-5-wire-bots.md](plans/bot-tools/stage-5-wire-bots.md) plan.
+[plans/stage-5-wire-bots.md](plans/stage-5-wire-bots.md) plan.
 
 _Earlier the same day:_
 
@@ -176,10 +198,10 @@ then compose + box deploy + live verify.
 | **Box deploy + live smoke test** | on Unraid | ⬜ next |
 | Wire the bots (Stage 5) | bots' `mcp_servers:` config | ⬜ |
 
-Backend + build plans (now in this repo, gitignored): `docs/plans/bot-tools/`
+Backend + build plans (now in this repo, gitignored): `docs/plans/`
 — `stage-{0,1,2,3}-*.md` (backend deploys, done), `stage-4-mcp-server.md`
 (this server's plan of record), `stage-5-wire-bots.md` (bots' `mcp_servers:`
-config). Master plan: `docs/plans/bot-workspace-tools-plan.md`.
+config). Master plan: `docs/plans/MASTER_PLAN.md`.
 
 ## Non-negotiables (carried from the backend stages)
 

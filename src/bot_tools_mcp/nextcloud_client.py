@@ -77,6 +77,22 @@ def put_file(cfg: NextcloudConfig, bot: str, password: str, path: str, content: 
         raise NextcloudError(f"PUT {path!r} failed: HTTP {resp.status_code}")
 
 
+def delete_file(cfg: NextcloudConfig, bot: str, password: str, path: str) -> None:
+    """Delete a file/folder from the bot's Nextcloud files (WebDAV DELETE).
+
+    Nextcloud moves the target to the bot's own trash rather than destroying it,
+    so a mistaken delete is recoverable from Files → Deleted files. `safe_path`
+    (via `_dav_url`) keeps the delete inside the bot's own root.
+    """
+    url = _dav_url(cfg, bot, path)
+    with _client(bot, password) as c:
+        resp = c.delete(url)
+    if resp.status_code == 404:
+        raise NextcloudError(f"file not found: {path!r}")
+    if resp.status_code >= 400:
+        raise NextcloudError(f"DELETE {path!r} failed: HTTP {resp.status_code}")
+
+
 def file_exists(cfg: NextcloudConfig, bot: str, password: str, path: str) -> bool:
     """True if the path exists in the bot's files (HEAD)."""
     url = _dav_url(cfg, bot, path)

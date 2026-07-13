@@ -231,7 +231,7 @@ sc donna doc_read '{"path":"smoke.docx"}'
 
 Record the run (date, what passed, any surprises) in
 [PROJECT_STATE.md](PROJECT_STATE.md)'s status block and the stage-4 deploy log
-in [plans/bot-tools/stage-4-mcp-server.md](plans/bot-tools/stage-4-mcp-server.md).
+in [plans/stage-4-mcp-server.md](plans/stage-4-mcp-server.md).
 
 ---
 

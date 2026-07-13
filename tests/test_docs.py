@@ -60,6 +60,14 @@ class _Store:
         self.urls_seen.append(cfg.internal_url)
         return [p for (b, p) in self.files if b == bot]
 
+    def delete_file(self, cfg, bot, password, path):
+        self.auth_seen.append((bot, password))
+        self.urls_seen.append(cfg.internal_url)
+        key = (bot, safe_path(path))
+        if key not in self.files:
+            raise nc.NextcloudError(f"file not found: {path!r}")
+        del self.files[key]
+
     def create_share_link(self, cfg, bot, password, path, **kw):
         self.auth_seen.append((bot, password))
         self.urls_seen.append(cfg.internal_url)
@@ -74,6 +82,7 @@ def store(monkeypatch):
     monkeypatch.setattr(nc, "get_file", s.get_file)
     monkeypatch.setattr(nc, "put_file", s.put_file)
     monkeypatch.setattr(nc, "list_files", s.list_files)
+    monkeypatch.setattr(nc, "delete_file", s.delete_file)
     monkeypatch.setattr(nc, "create_share_link", s.create_share_link)
     return s
 
@@ -121,6 +130,37 @@ async def test_doc_write_replaces(store, tools):
     await tools["doc_create"](ctx, path="d.docx", content="original")
     await tools["doc_write"](ctx, path="d.docx", content="replaced")
     assert await tools["doc_read"](ctx, path="d.docx") == "replaced"
+
+
+# --- delete ---
+
+
+async def test_delete_removes_the_file(store, tools):
+    ctx = _FakeCtx("claudette")
+    await tools["doc_create"](ctx, path="gone.docx", content="x")
+    assert await tools["delete_file"](ctx, path="gone.docx") == "deleted gone.docx"
+    with pytest.raises(ToolError, match="file not found"):
+        await tools["doc_read"](ctx, path="gone.docx")
+
+
+async def test_delete_missing_file_errors(store, tools):
+    with pytest.raises(ToolError, match="file not found"):
+        await tools["delete_file"](_FakeCtx("claudette"), path="never.docx")
+
+
+async def test_a_bot_cannot_delete_anothers_file(store, tools):
+    await tools["doc_create"](_FakeCtx("claudette"), path="mine.docx", content="x")
+    # donna deleting the same path resolves to (donna, mine.docx) — not found
+    with pytest.raises(ToolError, match="file not found"):
+        await tools["delete_file"](_FakeCtx("donna"), path="mine.docx")
+    # claudette's file is untouched
+    assert await tools["doc_read"](_FakeCtx("claudette"), path="mine.docx") == "x"
+
+
+@pytest.mark.parametrize("bad", ["/etc/passwd", "../secret.docx", "a/../../b.docx", ".."])
+async def test_delete_path_traversal_rejected(store, tools, bad):
+    with pytest.raises(ToolError, match="path"):
+        await tools["delete_file"](_FakeCtx("claudette"), path=bad)
 
 
 # --- per-bot auth + isolation ---
