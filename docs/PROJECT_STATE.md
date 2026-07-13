@@ -22,6 +22,33 @@ laptop-local). Stages 0–3 are **done and verified**; Stage 4 (this server) is
 
 ## ▶ Status
 
+### 2026-07-13 — STAGE 5 UNDERWAY — Claudette wired + docs/delete verified from real Telegram
+
+First bot (Claudette) is wired to the live MCP server and driving tools **from real
+Telegram messages**, not just container smoke tests.
+
+- **Claudette wired.** `mcp_servers.bot-tools` added to `~/.hermes/config.yaml` on
+  claudettelaptop → `http://192.168.1.11:9110/mcp` with `BOT_TOKEN_CLAUDETTE`. The
+  server's tools joined Hermes's bundle. Hermes now runs
+  `audrey_passthrough/glm-5.2:cloud` via Audrey (the earlier virtual-model attempts
+  broke Hermes; only `audrey_passthrough/*` works).
+- **Docs/sheets verified from Telegram** — create + share round-trip end-to-end from a
+  real chat message (checkbox 3 of the 5.4 plan).
+- **NEW TOOL: `delete_file`.** Bots could create/share Nextcloud files but not remove
+  them, so every test/scrapped request left orphans (hit this live — Claudette had to
+  ask the user to delete test files by hand). Added `nextcloud_client.delete_file`
+  (WebDAV DELETE, `safe_path`-guarded, moves to the bot's **own trash** so it's
+  recoverable) + the `delete_file` tool (per-bot scoped, fails loud on a missing path).
+  **90 tests green.** Deployed (git pull + `docker compose up -d --build`), and
+  **verified working from Telegram** after `hermes gateway restart` (the client caches
+  the tool list at handshake — a server rebuild alone isn't enough; the bot must
+  reconnect). Tool count is now **16**.
+
+**Remaining Stage 5.4 (from real chat messages):** email (inbox, right From, dkim=pass)
+and calendar invite (`.ics` + shows in the subscribed CalDAV client) driven from
+Telegram; confirm per-bot From identity holds. Then onboard the other bots
+(`brigitte`, `donna`) — add their `mcp_servers:` block with their own token.
+
 ### 2026-07-10 — docs/ reorganized (flatter plans/, added docs index)
 
 Tidied the docs tree — no content lost, tracked-vs-gitignored boundary unchanged:
@@ -193,10 +220,10 @@ then compose + box deploy + live verify.
 | Server + auth middleware | `src/bot_tools_mcp/server.py` | ✅ done, tested |
 | Email transport + tool | `email_smtp.py`, `tools/email_tools.py` | ✅ done, tested |
 | Calendar transport + tools | `caldav_client.py`, `tools/calendar_tools.py` | ✅ done, tested |
-| Docs/sheets transport + tools | `nextcloud_client.py`, `tools/docs.py` | ✅ done, tested |
+| Docs/sheets transport + tools (incl. `delete_file`) | `nextcloud_client.py`, `tools/docs.py` | ✅ done, tested |
 | Dockerfile + compose + `.env.example` | repo root | ✅ done |
-| **Box deploy + live smoke test** | on Unraid | ⬜ next |
-| Wire the bots (Stage 5) | bots' `mcp_servers:` config | ⬜ |
+| Box deploy + live smoke test | on Unraid | ✅ done, verified |
+| Wire the bots (Stage 5) | bots' `mcp_servers:` config | 🔶 Claudette wired + docs/delete verified from Telegram; email/calendar + other bots remain |
 
 Backend + build plans (now in this repo, gitignored): `docs/plans/`
 — `stage-{0,1,2,3}-*.md` (backend deploys, done), `stage-4-mcp-server.md`
