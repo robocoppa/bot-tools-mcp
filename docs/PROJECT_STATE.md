@@ -8,7 +8,8 @@ This is the **MCP server** half of the larger `bot-tools` workstream. The backen
 deploy stages (Brevo email, Radicale calendar, Nextcloud + Collabora docs) and
 all build/deploy plans live in this repo under `docs/plans/` (gitignored,
 laptop-local). Stages 0–3 are **done and verified**; Stage 4 (this server) is
-**done and live on the box**; Stage 5 (wiring the bots) is next.
+**done and live on the box**; Stage 5 (wiring the bots) is **DONE — all three bots
+(claudette, donna, brigitte) have all capabilities verified from real chat**.
 
 > **Continuity note — keep audrey's PROJECT_STATE light on this.**
 > `audrey_ai_2.0/docs/PROJECT_STATE.md` should carry only a **brief, general
@@ -21,6 +22,54 @@ laptop-local). Stages 0–3 are **done and verified**; Stage 4 (this server) is
 ---
 
 ## ▶ Status
+
+### 2026-07-14 — ✅ STAGE 5 DONE — all three bots have all capabilities, verified from real chat
+
+**The workstream's finish line.** All three bots — **claudette** (Hermes/GLM), **donna**
+(Hermes/Codex OAuth), **brigitte** (OpenClaw/Codex OAuth) — now drive the **full bot-tools set**
+(docs, sheets, email, calendar invite, delete) **from real chat messages**. Two runtimes (Hermes +
+OpenClaw), three model backends, one shared MCP server on the box, per-bot bearer-token identity.
+
+Stage 5.4 complete. bot-tools MCP workstream (Stages 0–5) is **done and live in production** across
+the fleet. Setup gotchas captured for future bots: Hermes reconnect after tool changes (use
+`/reload-mcp`), OpenClaw strict-JSON + literal token, and the macOS Codex app-server LAN-sandbox fix
+(§5.2a). Onboarding a new bot is now the §5.5 recipe: mint a token, add the MCP block on its host,
+done.
+
+**Token hardening — DONE (2026-07-14):** no literal bearer tokens left in any bot's config. Each
+host keeps `BOT_TOKEN_<NAME>` in its env file (`~/.hermes/.env` / `~/.openclaw/.env`) and the
+config references `${BOT_TOKEN_<NAME>}` — Hermes `mcp_servers.headers` and OpenClaw
+`mcp.servers.headers` both expand it (OpenClaw needs v2026.4.24+; verified working on all three
+after restart + a live tool action). SecretRef objects do NOT work for MCP headers — only `${VAR}`.
+Pattern is baked into the Stage 5 deploy doc (§ intro + §5.1/§5.2) for future bots.
+
+**Remaining follow-up (not a blocker):** per-bot From-identity spot check across the fleet if not
+already implicitly confirmed by each bot's successful sends.
+
+### 2026-07-14 — brigitte (OpenClaw + Codex) verified end-to-end + macOS LAN-sandbox gotcha solved
+
+Third bot live. **brigitte** (OpenClaw on a Mac mini, ChatGPT-OAuth **Codex** `gpt-5.5`) now
+drives bot-tools **from a real chat message** — doc + sheet + email + calendar invite all
+succeeded. Fleet is now: **claudette** (Hermes/GLM), **donna** (Hermes/Codex OAuth), **brigitte**
+(OpenClaw/Codex OAuth).
+
+- **The blocker, and the real fix.** brigitte's tools looked wired (`openclaw mcp probe` → 16
+  tools, `doctor` → ok) but her Codex session couldn't see them. Root cause was NOT tool
+  projection — it was **network**: OpenClaw runs Codex via the app-server harness, which on macOS
+  runs under the **seatbelt sandbox with networking disabled**, so it got `EHOSTUNREACH` reaching
+  the LAN server `192.168.1.11:9110` while the shell reached it fine (curl 406). Fix:
+  `plugins.entries.codex.config.appServer.sandbox = "danger-full-access"` in `openclaw.json`, then
+  a **full stop → kill lingering `codex` proc → start** + a fresh chat thread. Documented as
+  **Stage 5 §5.2a** (the gotcha + the exact diagnose-via-`codex-home/logs_2.sqlite` recipe).
+- **Lesson recorded:** `mcp probe`/`doctor` only prove the OpenClaw layer; when a **Codex** session
+  can't see MCP tools, read the Codex app-server's own log first — the connection error is there.
+- OpenClaw config specifics also captured in §5.2: it's strict JSON (not JSON5), `mcp.servers` is a
+  top-level key, use the **literal** token (no `${VAR}` expansion), `transport: streamable-http`.
+
+**Stage 5.4 status:** brigitte = docs/sheets **+ email + calendar** all verified from chat.
+claudette = docs/sheets + delete verified; email/calendar still pending. donna (Hermes/Codex) wired,
+tools working, 5.4 checks pending. Remaining: claudette + donna email/calendar confirmation, and the
+per-bot From-identity check across all three (no cross-bot spoofing).
 
 ### 2026-07-13 — STAGE 5 UNDERWAY — Claudette wired + docs/delete verified from real Telegram
 
